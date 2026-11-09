@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#FAF7F2" />
+  <title>Swipe Notes — Minimalist Pastel Routine & Task Cards</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    body {
+      user-select: none;
+      -webkit-user-select: none;
+      overflow-x: hidden;
+      background-color: #FAF7F2;
+    }
+    input, textarea {
+      user-select: text;
+      -webkit-user-select: text;
+    }
+    .swipe-card {
+      touch-action: none;
+      will-change: transform, opacity;
+      transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+    }
+    .swipe-card.dragging {
+      transition: none !important;
+      cursor: grabbing !important;
+    }
+    .badge-stamp {
+      pointer-events: none;
+      transition: opacity 0.12s ease;
+    }
+  </style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col justify-between">
+
+  <span id="deckPositionLabel" class="hidden"></span>
+
+  <div class="hidden" id="categoryFilterBar">
+    <button data-cat="all" type="button" class="cat-pill">All</button>
+    <button data-cat="routine" type="button" class="cat-pill">Routine</button>
+    <button data-cat="todo" type="button" class="cat-pill">Todo</button>
+  </div>
+
+  <!-- Main Center Stage -->
+  <main class="flex-1 w-full max-w-md mx-auto px-5 pt-3 pb-2 flex flex-col items-center justify-center">
+
+    <!-- SWIPE CARD VIEW -->
+    <div id="swipeViewContainer" class="w-full flex flex-col items-center">
+      <!-- Card Stack -->
+      <div id="cardStage" class="relative w-full h-[445px] flex items-center justify-center select-none">
+        <!-- Injected by JS -->
+      </div>
+
+      <!-- Subtle Light Pastel Later / Done Buttons with Low Contrast -->
+      <div id="swipeControlsBar" class="mt-5 flex items-center justify-center gap-3.5 w-full">
+        <button id="btnSwipeLeft" type="button" class="flex-1 py-2.5 rounded-2xl bg-[#FCF4EC] hover:bg-[#F9EDE2] border border-[#F4E4D4] text-[#9A775C] text-xs font-medium transition flex items-center justify-center gap-1.5">
+          <span class="opacity-60">←</span>
+          <span>Later</span>
+        </button>
+
+        <button id="btnSwipeRight" type="button" class="flex-1 py-2.5 rounded-2xl bg-[#F0F7F2] hover:bg-[#E5F2E8] border border-[#DCEDE0] text-[#5C8C6F] text-xs font-medium transition flex items-center justify-center gap-1.5">
+          <span>Done</span>
+          <span class="opacity-60">→</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- MINIMAL LIST VIEW -->
+    <div id="gridViewContainer" class="w-full hidden flex-col gap-2.5 self-start">
+      <div id="cardsGridList" class="flex flex-col gap-2.5 w-full"></div>
+    </div>
+
+  </main>
+
+  <!-- Collapsible Bottom Panel Inside a Chevron Arrow Button -->
+  <footer class="w-full max-w-md mx-auto px-5 pb-10 mb-2 pt-1 flex flex-col items-center justify-end relative">
+    <!-- Hidden/Collapsible Bottom Panel -->
+    <div id="bottomDockPanel" class="w-full mb-2.5 hidden transition-all duration-200">
+      <div class="w-full rounded-2xl bg-white/95 backdrop-blur-sm border border-rose-200/80 px-3 py-2.5 shadow-md flex items-center justify-between gap-1">
+        <div class="flex items-center gap-1">
+          <button id="viewSwipeBtn" type="button" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-violet-900 bg-violet-100/80 transition">Cards</button>
+          <button id="viewGridBtn" type="button" class="px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-800 transition">List</button>
+        </div>
+
+        <button id="openModalBtn" type="button" class="px-3.5 py-1.5 rounded-xl bg-violet-200 hover:bg-violet-300/80 text-violet-950 text-xs font-semibold transition shadow-sm">
+          + New
+        </button>
+
+        <div class="flex items-center gap-1">
+          <button id="btnEditCurrent" type="button" title="Edit current card" class="px-2 py-1.5 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-rose-100/50 transition">
+            Edit card
+          </button>
+          <button id="undoSwipeBtn" type="button" disabled title="Undo last swipe" class="px-2 py-1.5 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-rose-100/50 disabled:opacity-30 disabled:pointer-events-none transition">
+            Undo
+          </button>
+          <button id="resetRoutinesBtn" type="button" title="Reset all cards" class="px-2 py-1.5 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-amber-100/50 transition">
+            Reset
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chevron Row with Stats Counter at the Rightmost End -->
+    <div class="w-full relative flex items-center justify-center">
+      <!-- Centered Chevron Button -->
+      <button id="toggleDockBtn" type="button" aria-label="Toggle bottom menu" title="More actions" class="w-10 h-10 rounded-full bg-violet-100/90 hover:bg-violet-200/90 border border-violet-200/80 text-violet-800 shadow-sm flex items-center justify-center transition active:scale-95">
+        <svg id="chevronIcon" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+        </svg>
+      </button>
+
+      <!-- Rightmost 1/5 Stats Counter -->
+      <span id="statsCounter" class="absolute right-1 text-xs text-slate-400 font-medium tracking-tight">0/5</span>
+    </div>
+  </footer>
+
+  <!-- Minimal Pastel Toast -->
+  <div id="toastBanner" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-opacity duration-200 bg-violet-200 border border-violet-300 text-violet-950 px-4 py-1.5 rounded-full shadow-md text-xs font-medium">
+    <span id="toastText">Saved</span>
+  </div>
+
+  <!-- Minimal Add / Edit Modal -->
+  <div id="cardModalOverlay" class="fixed inset-0 z-50 bg-slate-900/25 backdrop-blur-[2px] hidden items-center justify-center p-4">
+    <div class="bg-[#FFFDF9] border border-rose-200/80 w-full max-w-sm rounded-3xl shadow-xl p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="modalHeading" class="text-sm font-semibold text-slate-800">New Card</h2>
+        <button id="closeModalBtn" type="button" class="text-slate-400 hover:text-slate-700 text-xs">✕</button>
+      </div>
+
+      <form id="cardForm" class="space-y-3.5">
+        <input type="hidden" id="cardIdInput" />
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs text-slate-500">Title</span>
+            <div class="flex items-center gap-1">
+              <button id="titleFontDecBtn" type="button" title="Decrease title font size" class="px-2 py-0.5 rounded-lg bg-rose-100/70 hover:bg-rose-200/70 text-slate-700 text-xs font-semibold transition">A−</button>
+              <span id="titleFontSizeLabel" class="text-[11px] text-slate-500 w-9 text-center font-medium">24px</span>
+              <button id="titleFontIncBtn" type="button" title="Increase title font size" class="px-2 py-0.5 rounded-lg bg-rose-100/70 hover:bg-rose-200/70 text-slate-700 text-xs font-semibold transition">A+</button>
+            </div>
+          </div>
+          <input id="cardTitleInput" type="text" required maxlength="80" placeholder="Card title (e.g., Morning Routine)" class="w-full px-3.5 py-2 rounded-xl bg-rose-50/50 border border-rose-200/70 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-300" />
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs text-slate-500">Note text</span>
+            <div class="flex items-center gap-1">
+              <button id="noteFontDecBtn" type="button" title="Decrease note font size" class="px-2 py-0.5 rounded-lg bg-rose-100/70 hover:bg-rose-200/70 text-slate-700 text-xs font-semibold transition">A−</button>
+              <span id="noteFontSizeLabel" class="text-[11px] text-slate-500 w-9 text-center font-medium">18px</span>
+              <button id="noteFontIncBtn" type="button" title="Increase note font size" class="px-2 py-0.5 rounded-lg bg-rose-100/70 hover:bg-rose-200/70 text-slate-700 text-xs font-semibold transition">A+</button>
+            </div>
+          </div>
+          <textarea id="cardFrontNoteInput" rows="4" placeholder="Write a short note or list items (one per line)..." class="w-full px-3.5 py-2 rounded-xl bg-rose-50/50 border border-rose-200/70 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-300"></textarea>
+        </div>
+
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-xs text-slate-500">Card color:</span>
+          <div class="hidden">
+            <select id="cardCategoryInput">
+              <option value="routine">Routine</option>
+              <option value="todo">Todo</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-1.5" id="pastelPicker">
+            <button type="button" data-pastel="peach" title="Pastel Peach" class="pastel-swatch w-5 h-5 rounded-full bg-[#FFE8D6] border-2 border-amber-400"></button>
+            <button type="button" data-pastel="mint" title="Pastel Mint" class="pastel-swatch w-5 h-5 rounded-full bg-[#DCFCE7] border border-emerald-300"></button>
+            <button type="button" data-pastel="lavender" title="Pastel Lavender" class="pastel-swatch w-5 h-5 rounded-full bg-[#EDE9FE] border border-violet-300"></button>
+            <button type="button" data-pastel="sky" title="Pastel Sky" class="pastel-swatch w-5 h-5 rounded-full bg-[#E0F2FE] border border-sky-300"></button>
+            <button type="button" data-pastel="blush" title="Pastel Blush" class="pastel-swatch w-5 h-5 rounded-full bg-[#FCE7F3] border border-pink-300"></button>
+          </div>
+        </div>
+
+        <div class="pt-2 flex items-center justify-between gap-2">
+          <button id="deleteCardModalBtn" type="button" class="text-xs text-rose-500 hover:text-rose-700 font-medium hidden">
+            Delete
+          </button>
+          <div class="flex items-center gap-2 ml-auto">
+            <button id="cancelModalBtn" type="button" class="px-3 py-1.5 rounded-xl text-xs text-slate-500 hover:bg-slate-100">
+              Cancel
+            </button>
+            <button type="submit" class="px-4 py-1.5 rounded-xl bg-violet-200 hover:bg-violet-300 text-violet-950 text-xs font-semibold">
+              Save
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'minimal_pastel_swipenotes_v2';
+
+    const PASTEL_THEMES = {
+      peach: {
+        cardBg: 'bg-[#FFF0E5]',
+        border: 'border-[#F7D4BC]',
+        tag: 'bg-[#FFE2CC] text-[#8C4A27]',
+        divider: 'border-[#F5DEC9]',
+        checkAccent: 'accent-[#D97742]'
+      },
+      mint: {
+        cardBg: 'bg-[#EAFBF0]',
+        border: 'border-[#C3EED2]',
+        tag: 'bg-[#D3F8E2] text-[#22643D]',
+        divider: 'border-[#D4F2DF]',
+        checkAccent: 'accent-[#388E5A]'
+      },
+      lavender: {
+        cardBg: 'bg-[#F3EEFF]',
+        border: 'border-[#DDD0F7]',
+        tag: 'bg-[#E5DCFF] text-[#4C3585]',
+        divider: 'border-[#E6DDF9]',
+        checkAccent: 'accent-[#6E56AF]'
+      },
+      sky: {
+        cardBg: 'bg-[#EBF6FF]',
+        border: 'border-[#C6E2F9]',
+        tag: 'bg-[#D6ECFF] text-[#1E567C]',
+        divider: 'border-[#D8ECFC]',
+        checkAccent: 'accent-[#3B82B6]'
+      },
+      blush: {
+        cardBg: 'bg-[#FFF0F6]',
+        border: 'border-[#F8CFE2]',
+        tag: 'bg-[#FFDCEB] text-[#852E57]',
+        divider: 'border-[#F9DCEB]',
+        checkAccent: 'accent-[#C85A89]'
+      }
+    };
+
+    const PASTEL_KEYS = Object.keys(PASTEL_THEMES);
+
+    const DEFAULT_CARDS = [
+      {
+        id: 'c1',
+        title: 'Morning Reset',
+        category: 'routine',
+        pastel: 'peach',
+        note: 'Drink a full glass of water\n5 minutes of gentle stretching\nPick top 3 tasks for today',
+        checks: [false, false, false],
+        completed: false,
+        order: 1
+      },
+      {
+        id: 'c2',
+        title: 'Deep Work Block',
+        category: 'todo',
+        pastel: 'lavender',
+        note: 'Put phone on silent and finish the most important task before checking messages.',
+        checks: [false],
+        completed: false,
+        order: 2
+      },
+      {
+        id: 'c3',
+        title: 'Midday Walk',
+        category: 'routine',
+        pastel: 'mint',
+        note: 'Step outside for 10 minutes after lunch to reset focus and posture.',
+        checks: [false],
+        completed: false,
+        order: 3
+      },
+      {
+        id: 'c4',
+        title: 'Clear Quick Errands',
+        category: 'todo',
+        pastel: 'sky',
+        note: 'Reply to pending emails\nPay utility bill\nTidy desk surface',
+        checks: [false, false, false],
+        completed: false,
+        order: 4
+      },
+      {
+        id: 'c5',
+        title: 'Evening Wind Down',
+        category: 'routine',
+        pastel: 'blush',
+        note: 'Write down tomorrow’s top task\nClose open tabs\nNo screens 30 mins before bed',
+        checks: [false, false, false],
+        completed: false,
+        order: 5
+      }
+    ];
+
+    let cards = [];
+    let currentCategory = 'all';
+    let currentView = 'swipe';
+    let selectedPastel = 'peach';
+    let currentTitleSize = 24;
+    let currentNoteSize = 18;
+    let historyStack = [];
+
+    function loadCards() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            cards = parsed;
+            return;
+          }
+        }
+      } catch (e) {}
+      cards = JSON.parse(JSON.stringify(DEFAULT_CARDS));
+    }
+
+    function saveCards() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
+      } catch (e) {}
+    }
+
+    function showToast(msg) {
+      const banner = document.getElementById('toastBanner');
+      const text = document.getElementById('toastText');
+      text.textContent = msg;
+      banner.classList.remove('opacity-0');
+      banner.classList.add('opacity-100');
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => {
+        banner.classList.add('opacity-0');
+        banner.classList.remove('opacity-100');
+      }, 1600);
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function getActiveDeck() {
+      const sorted = [...cards].sort((a, b) => (a.order || 0) - (b.order || 0));
+      return sorted.filter(c => {
+        if (c.completed) return false;
+        if (currentCategory === 'all') return true;
+        return c.category === currentCategory;
+      });
+    }
+
+    function updateSwatchSelection() {
+      document.querySelectorAll('#pastelPicker .pastel-swatch').forEach(btn => {
+        const key = btn.getAttribute('data-pastel');
+        if (key === selectedPastel) {
+          btn.classList.add('ring-2', 'ring-slate-600', 'scale-110');
+        } else {
+          btn.classList.remove('ring-2', 'ring-slate-600', 'scale-110');
+        }
+      });
+    }
+
+    function renderAll() {
+      const done = cards.filter(c => c.completed).length;
+      document.getElementById('statsCounter').textContent = `${done}/${cards.length}`;
+      document.getElementById('undoSwipeBtn').disabled = historyStack.length === 0;
+
+      document.querySelectorAll('#categoryFilterBar .cat-pill').forEach(btn => {
+        const cat = btn.getAttribute('data-cat');
+        const active = cat === currentCategory;
+        if (active) {
+          btn.className = 'cat-pill px-3 py-1 rounded-full text-xs font-semibold transition bg-rose-200/90 text-rose-950 shadow-sm';
+        } else {
+          btn.className = 'cat-pill px-3 py-1 rounded-full text-xs font-medium transition text-slate-500 hover:bg-rose-100/60 hover:text-slate-800';
+        }
+      });
+
+      if (currentView === 'swipe') {
+        renderSwipeStage();
+      } else {
+        renderListStage();
+      }
+    }
+
+    function renderSwipeStage() {
+      const stage = document.getElementById('cardStage');
+      const deck = getActiveDeck();
+      const posLabel = document.getElementById('deckPositionLabel');
+      const controlsBar = document.getElementById('swipeControlsBar');
+      const editBtn = document.getElementById('btnEditCurrent');
+
+      stage.innerHTML = '';
+
+      if (deck.length === 0) {
+        posLabel.textContent = '';
+        controlsBar.classList.add('opacity-30', 'pointer-events-none');
+        editBtn.classList.add('hidden');
+        stage.innerHTML = `
+          <div class="w-full h-full rounded-3xl bg-[#F3EEFF] border border-[#DDD0F7] p-8 flex flex-col items-center justify-center text-center shadow-sm">
+            <div class="w-10 h-10 rounded-full bg-[#DCFCE7] text-[#22643D] flex items-center justify-center text-lg font-bold mb-3">✓</div>
+            <p class="text-sm font-semibold text-slate-800 mb-1">All caught up</p>
+            <p class="text-xs text-slate-500 mb-5">No remaining cards in this view.</p>
+            <button id="emptyResetBtn" type="button" class="px-4 py-2 rounded-xl bg-white/80 hover:bg-white text-xs font-semibold text-violet-900 border border-violet-200 transition shadow-sm">
+              Reset cards
+            </button>
+          </div>
+        `;
+        const resetBtn = document.getElementById('emptyResetBtn');
+        if (resetBtn) resetBtn.addEventListener('click', resetAllDeck);
+        return;
+      }
+
+      controlsBar.classList.remove('opacity-30', 'pointer-events-none');
+      editBtn.classList.remove('hidden');
+      posLabel.textContent = '';
+
+      const visible = deck.slice(0, 3);
+      for (let i = visible.length - 1; i >= 0; i--) {
+        const card = visible[i];
+        const isTop = i === 0;
+        const pTheme = PASTEL_THEMES[card.pastel] || PASTEL_THEMES.peach;
+        const lines = (card.note || '').split('\n').map(s => s.trim()).filter(Boolean);
+        const isMultiLine = lines.length > 1;
+
+        const cardEl = document.createElement('div');
+        cardEl.className = `swipe-card absolute inset-0 rounded-3xl ${pTheme.cardBg} border-2 ${pTheme.border} shadow-md p-7 flex flex-col justify-between ${isTop ? 'cursor-grab z-20' : 'pointer-events-none z-10'}`;
+
+        const scale = 1 - i * 0.04;
+        const translateY = i * 11;
+        const opacity = 1 - i * 0.22;
+        cardEl.style.transform = `translate3d(0px, ${translateY}px, 0px) scale(${scale})`;
+        cardEl.style.opacity = String(opacity);
+
+        const tSize = card.titleSize || 24;
+        const nSize = card.noteSize || 18;
+        let bodyHtml = '';
+        if (isMultiLine) {
+          bodyHtml = `<div class="space-y-2.5">` + lines.map((line, idx) => {
+            const checked = Array.isArray(card.checks) && card.checks[idx];
+            return `
+              <label class="flex items-start gap-3 cursor-pointer group">
+                <input type="checkbox" data-line-idx="${idx}" ${checked ? 'checked' : ''} class="mt-1 w-4 h-4 rounded border-slate-300 ${pTheme.checkAccent} cursor-pointer" />
+                <span style="font-size: ${nSize}px; line-height: 1.5;" class="${checked ? 'line-through text-slate-400' : 'text-slate-700'}">${escapeHtml(line)}</span>
+              </label>
+            `;
+          }).join('') + `</div>`;
+        } else {
+          bodyHtml = `<p style="font-size: ${nSize}px; line-height: 1.55;" class="text-slate-700">${escapeHtml(card.note || '')}</p>`;
+        }
+
+        cardEl.innerHTML = `
+          <div id="stampRight-${card.id}" class="badge-stamp opacity-0 absolute top-5 right-6 text-xs font-medium uppercase tracking-wider text-[#5C8C6F] bg-[#F0F7F2] px-2 py-0.5 rounded-md border border-[#DCEDE0]">
+            Done
+          </div>
+          <div id="stampLeft-${card.id}" class="badge-stamp opacity-0 absolute top-5 left-6 text-xs font-medium uppercase tracking-wider text-[#9A775C] bg-[#FCF4EC] px-2 py-0.5 rounded-md border border-[#F4E4D4]">
+            Later
+          </div>
+
+          <div>
+            <h2 style="font-size: ${tSize}px; line-height: 1.3;" class="font-semibold text-slate-800 tracking-tight">
+              ${escapeHtml(card.title)}
+            </h2>
+          </div>
+
+          <div class="my-auto py-4 overflow-y-auto max-h-[260px]">
+            ${bodyHtml}
+          </div>
+
+
+        `;
+
+        if (isTop) {
+          attachCardSwipe(cardEl, card);
+        }
+
+        stage.appendChild(cardEl);
+      }
+    }
+
+    function attachCardSwipe(cardEl, card) {
+      cardEl.querySelectorAll('input[type="checkbox"][data-line-idx]').forEach(cb => {
+        cb.addEventListener('pointerdown', e => e.stopPropagation());
+        cb.addEventListener('change', () => {
+          const idx = Number(cb.getAttribute('data-line-idx'));
+          if (!Array.isArray(card.checks)) card.checks = [];
+          card.checks[idx] = cb.checked;
+          saveCards();
+          renderSwipeStage();
+        });
+      });
+
+      let startX = 0;
+      let startY = 0;
+      let currentX = 0;
+      let currentY = 0;
+      let isDragging = false;
+
+      const stampRight = cardEl.querySelector(`#stampRight-${card.id}`);
+      const stampLeft = cardEl.querySelector(`#stampLeft-${card.id}`);
+
+      function onPointerDown(e) {
+        if (e.target.closest('input, button, label')) return;
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        currentX = 0;
+        currentY = 0;
+        cardEl.classList.add('dragging');
+        if (cardEl.setPointerCapture && e.pointerId !== undefined) {
+          try { cardEl.setPointerCapture(e.pointerId); } catch (err) {}
+        }
+      }
+
+      function onPointerMove(e) {
+        if (!isDragging) return;
+        currentX = e.clientX - startX;
+        currentY = e.clientY - startY;
+        const rotate = currentX * 0.04;
+        cardEl.style.transform = `translate3d(${currentX}px, ${currentY}px, 0px) rotate(${rotate}deg)`;
+
+        const opacity = Math.min(Math.abs(currentX) / 22, 1);
+        if (currentX > 5) {
+          if (stampRight) stampRight.style.opacity = String(opacity);
+          if (stampLeft) stampLeft.style.opacity = '0';
+        } else if (currentX < -5) {
+          if (stampLeft) stampLeft.style.opacity = String(opacity);
+          if (stampRight) stampRight.style.opacity = '0';
+        } else {
+          if (stampRight) stampRight.style.opacity = '0';
+          if (stampLeft) stampLeft.style.opacity = '0';
+        }
+      }
+
+      function onPointerUp() {
+        if (!isDragging) return;
+        isDragging = false;
+        cardEl.classList.remove('dragging');
+
+        if (currentX > 22) {
+          commitSwipe(card.id, 'right', cardEl);
+        } else if (currentX < -22) {
+          commitSwipe(card.id, 'left', cardEl);
+        } else {
+          cardEl.style.transform = 'translate3d(0px, 0px, 0px) scale(1)';
+          if (stampRight) stampRight.style.opacity = '0';
+          if (stampLeft) stampLeft.style.opacity = '0';
+        }
+      }
+
+      cardEl.addEventListener('pointerdown', onPointerDown);
+      cardEl.addEventListener('pointermove', onPointerMove);
+      cardEl.addEventListener('pointerup', onPointerUp);
+      cardEl.addEventListener('pointercancel', onPointerUp);
+    }
+
+    function commitSwipe(cardId, direction, cardEl) {
+      const target = cards.find(c => c.id === cardId);
+      if (!target) return;
+
+      historyStack.push(JSON.stringify(cards));
+      if (historyStack.length > 20) historyStack.shift();
+
+      if (cardEl) {
+        const flyX = direction === 'right' ? 360 : -360;
+        cardEl.style.transform = `translate3d(${flyX}px, 10px, 0px) rotate(${direction === 'right' ? 12 : -12}deg)`;
+        cardEl.style.opacity = '0';
+      }
+
+      setTimeout(() => {
+        if (direction === 'right') {
+          target.completed = true;
+        } else {
+          const maxOrder = cards.reduce((m, c) => Math.max(m, c.order || 0), 0);
+          target.order = maxOrder + 1;
+        }
+        saveCards();
+        renderAll();
+      }, 190);
+    }
+
+    function renderListStage() {
+      const listEl = document.getElementById('cardsGridList');
+      const filtered = cards.filter(c => currentCategory === 'all' || c.category === currentCategory);
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `<p class="text-xs text-slate-400 text-center py-8">No cards yet.</p>`;
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(card => {
+        const pTheme = PASTEL_THEMES[card.pastel] || PASTEL_THEMES.peach;
+        return `
+          <div class="${pTheme.cardBg} border ${pTheme.border} rounded-2xl p-4 flex items-center justify-between gap-3 shadow-sm">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <h3 class="text-sm font-semibold text-slate-800 truncate ${card.completed ? 'line-through text-slate-400' : ''}">${escapeHtml(card.title)}</h3>
+              </div>
+              <p class="text-xs text-slate-600 truncate mt-1">${escapeHtml((card.note || '').replace(/\n/g, ' • '))}</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button data-toggle-id="${card.id}" type="button" class="px-2.5 py-1 rounded-lg text-xs font-medium bg-white/80 hover:bg-white border border-slate-200/80 text-slate-700">
+                ${card.completed ? 'Undo' : 'Done'}
+              </button>
+              <button data-edit-id="${card.id}" type="button" class="px-2 py-1 text-xs text-slate-500 hover:text-slate-800">
+                Edit
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      listEl.querySelectorAll('[data-toggle-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const c = cards.find(item => item.id === btn.getAttribute('data-toggle-id'));
+          if (c) {
+            c.completed = !c.completed;
+            saveCards();
+            renderAll();
+          }
+        });
+      });
+
+      listEl.querySelectorAll('[data-edit-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const c = cards.find(item => item.id === btn.getAttribute('data-edit-id'));
+          if (c) openCardModal(c);
+        });
+      });
+    }
+
+    function updateModalFontPreview() {
+      document.getElementById('titleFontSizeLabel').textContent = currentTitleSize + 'px';
+      document.getElementById('noteFontSizeLabel').textContent = currentNoteSize + 'px';
+      document.getElementById('cardTitleInput').style.fontSize = currentTitleSize + 'px';
+      document.getElementById('cardFrontNoteInput').style.fontSize = currentNoteSize + 'px';
+    }
+
+    function openCardModal(card = null) {
+      const overlay = document.getElementById('cardModalOverlay');
+      const delBtn = document.getElementById('deleteCardModalBtn');
+
+      if (card) {
+        document.getElementById('modalHeading').textContent = 'Edit Card';
+        document.getElementById('cardIdInput').value = card.id;
+        document.getElementById('cardTitleInput').value = card.title || '';
+        document.getElementById('cardFrontNoteInput').value = card.note || '';
+        document.getElementById('cardCategoryInput').value = card.category || 'routine';
+        selectedPastel = card.pastel || 'peach';
+        currentTitleSize = card.titleSize || 24;
+        currentNoteSize = card.noteSize || 18;
+        delBtn.classList.remove('hidden');
+      } else {
+        document.getElementById('modalHeading').textContent = 'New Card';
+        document.getElementById('cardForm').reset();
+        document.getElementById('cardIdInput').value = '';
+        if (currentCategory !== 'all') {
+          document.getElementById('cardCategoryInput').value = currentCategory;
+        }
+        selectedPastel = PASTEL_KEYS[cards.length % PASTEL_KEYS.length];
+        currentTitleSize = 24;
+        currentNoteSize = 18;
+        delBtn.classList.add('hidden');
+      }
+
+      updateSwatchSelection();
+      updateModalFontPreview();
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+      document.getElementById('cardTitleInput').focus();
+    }
+
+    function closeCardModal() {
+      const overlay = document.getElementById('cardModalOverlay');
+      overlay.classList.add('hidden');
+      overlay.classList.remove('flex');
+    }
+
+    function resetAllDeck() {
+      historyStack.push(JSON.stringify(cards));
+      cards.forEach(c => {
+        c.completed = false;
+        if (Array.isArray(c.checks)) c.checks = c.checks.map(() => false);
+      });
+      saveCards();
+      renderAll();
+      showToast('All cards reset');
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadCards();
+      renderAll();
+
+      const toggleDockBtn = document.getElementById('toggleDockBtn');
+      const bottomDockPanel = document.getElementById('bottomDockPanel');
+      const chevronIcon = document.getElementById('chevronIcon');
+
+      toggleDockBtn.addEventListener('click', () => {
+        const isHidden = bottomDockPanel.classList.contains('hidden');
+        if (isHidden) {
+          bottomDockPanel.classList.remove('hidden');
+          chevronIcon.classList.add('rotate-180');
+        } else {
+          bottomDockPanel.classList.add('hidden');
+          chevronIcon.classList.remove('rotate-180');
+        }
+      });
+
+      document.querySelectorAll('#pastelPicker .pastel-swatch').forEach(btn => {
+        btn.addEventListener('click', () => {
+          selectedPastel = btn.getAttribute('data-pastel');
+          updateSwatchSelection();
+        });
+      });
+
+      document.getElementById('titleFontDecBtn').addEventListener('click', () => {
+        currentTitleSize = Math.max(14, currentTitleSize - 2);
+        updateModalFontPreview();
+      });
+
+      document.getElementById('titleFontIncBtn').addEventListener('click', () => {
+        currentTitleSize = Math.min(34, currentTitleSize + 2);
+        updateModalFontPreview();
+      });
+
+      document.getElementById('noteFontDecBtn').addEventListener('click', () => {
+        currentNoteSize = Math.max(12, currentNoteSize - 1);
+        updateModalFontPreview();
+      });
+
+      document.getElementById('noteFontIncBtn').addEventListener('click', () => {
+        currentNoteSize = Math.min(28, currentNoteSize + 1);
+        updateModalFontPreview();
+      });
+
+      const viewSwipeBtn = document.getElementById('viewSwipeBtn');
+      const viewGridBtn = document.getElementById('viewGridBtn');
+      const swipeViewContainer = document.getElementById('swipeViewContainer');
+      const gridViewContainer = document.getElementById('gridViewContainer');
+
+      viewSwipeBtn.addEventListener('click', () => {
+        currentView = 'swipe';
+        viewSwipeBtn.className = 'px-2.5 py-1.5 rounded-xl text-xs font-semibold text-violet-900 bg-violet-100/80 transition';
+        viewGridBtn.className = 'px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-800 transition';
+        swipeViewContainer.classList.remove('hidden');
+        gridViewContainer.classList.add('hidden');
+        gridViewContainer.classList.remove('flex');
+        renderAll();
+      });
+
+      viewGridBtn.addEventListener('click', () => {
+        currentView = 'grid';
+        viewGridBtn.className = 'px-2.5 py-1.5 rounded-xl text-xs font-semibold text-violet-900 bg-violet-100/80 transition';
+        viewSwipeBtn.className = 'px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-800 transition';
+        swipeViewContainer.classList.add('hidden');
+        gridViewContainer.classList.remove('hidden');
+        gridViewContainer.classList.add('flex');
+        renderAll();
+      });
+
+      document.querySelectorAll('#categoryFilterBar .cat-pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+          currentCategory = btn.getAttribute('data-cat');
+          renderAll();
+        });
+      });
+
+      document.getElementById('btnSwipeLeft').addEventListener('click', () => {
+        const deck = getActiveDeck();
+        if (deck.length > 0) {
+          const topEl = document.querySelector('#cardStage .swipe-card:last-child');
+          commitSwipe(deck[0].id, 'left', topEl);
+        }
+      });
+
+      document.getElementById('btnSwipeRight').addEventListener('click', () => {
+        const deck = getActiveDeck();
+        if (deck.length > 0) {
+          const topEl = document.querySelector('#cardStage .swipe-card:last-child');
+          commitSwipe(deck[0].id, 'right', topEl);
+        }
+      });
+
+      document.getElementById('btnEditCurrent').addEventListener('click', () => {
+        const deck = getActiveDeck();
+        if (deck.length > 0) openCardModal(deck[0]);
+      });
+
+      document.getElementById('undoSwipeBtn').addEventListener('click', () => {
+        if (historyStack.length > 0) {
+          cards = JSON.parse(historyStack.pop());
+          saveCards();
+          renderAll();
+          showToast('Undone');
+        }
+      });
+
+      document.getElementById('resetRoutinesBtn').addEventListener('click', resetAllDeck);
+      document.getElementById('openModalBtn').addEventListener('click', () => openCardModal());
+      document.getElementById('closeModalBtn').addEventListener('click', closeCardModal);
+      document.getElementById('cancelModalBtn').addEventListener('click', closeCardModal);
+
+      document.getElementById('cardForm').addEventListener('submit', e => {
+        e.preventDefault();
+        const id = document.getElementById('cardIdInput').value;
+        const title = document.getElementById('cardTitleInput').value.trim();
+        if (!title) return;
+        const note = document.getElementById('cardFrontNoteInput').value.trim();
+        const category = document.getElementById('cardCategoryInput').value;
+        const lineCount = note.split('\n').filter(Boolean).length;
+
+        if (id) {
+          const existing = cards.find(c => c.id === id);
+          if (existing) {
+            existing.title = title;
+            existing.note = note;
+            existing.category = category;
+            existing.pastel = selectedPastel;
+            existing.titleSize = currentTitleSize;
+            existing.noteSize = currentNoteSize;
+            existing.checks = new Array(lineCount).fill(false);
+          }
+        } else {
+          const minOrder = cards.reduce((m, c) => Math.min(m, c.order || 0), 0);
+          cards.push({
+            id: 'c-' + Date.now(),
+            title,
+            note,
+            category,
+            pastel: selectedPastel,
+            titleSize: currentTitleSize,
+            noteSize: currentNoteSize,
+            checks: new Array(lineCount).fill(false),
+            completed: false,
+            order: minOrder - 1
+          });
+        }
+        saveCards();
+        closeCardModal();
+        renderAll();
+      });
+
+      document.getElementById('deleteCardModalBtn').addEventListener('click', () => {
+        const id = document.getElementById('cardIdInput').value;
+        if (!id) return;
+        cards = cards.filter(c => c.id !== id);
+        saveCards();
+        closeCardModal();
+        renderAll();
+      });
+
+      window.addEventListener('keydown', e => {
+        const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+        if (!document.getElementById('cardModalOverlay').classList.contains('hidden')) return;
+        if (currentView !== 'swipe') return;
+
+        const deck = getActiveDeck();
+        if (deck.length === 0) return;
+
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          const topEl = document.querySelector('#cardStage .swipe-card:last-child');
+          commitSwipe(deck[0].id, 'right', topEl);
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          const topEl = document.querySelector('#cardStage .swipe-card:last-child');
+          commitSwipe(deck[0].id, 'left', topEl);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
