@@ -158,7 +158,7 @@
               <button id="noteFontIncBtn" type="button" title="Increase note font size" class="px-2 py-0.5 rounded-lg bg-rose-100/70 hover:bg-rose-200/70 text-slate-700 text-xs font-semibold transition">A+</button>
             </div>
           </div>
-          <textarea id="cardFrontNoteInput" rows="4" placeholder="Write a short note or list items (one per line)..." class="w-full px-3.5 py-2 rounded-xl bg-rose-50/50 border border-rose-200/70 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-300"></textarea>
+          <textarea id="cardFrontNoteInput" rows="4" placeholder="Write a note, or start lines with [] or () for checkboxes..." class="w-full px-3.5 py-2 rounded-xl bg-rose-50/50 border border-rose-200/70 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-300"></textarea>
         </div>
 
         <div class="flex items-center justify-between gap-3">
@@ -197,7 +197,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'minimal_pastel_swipenotes_v2';
+    const STORAGE_KEY = 'minimal_pastel_swipenotes_v3';
 
     const PASTEL_THEMES = {
       peach: {
@@ -245,7 +245,7 @@
         title: 'Morning Reset',
         category: 'routine',
         pastel: 'peach',
-        note: 'Drink a full glass of water\n5 minutes of gentle stretching\nPick top 3 tasks for today',
+        note: '[] Drink a full glass of water\n[] 5 minutes of gentle stretching\n() Pick top 3 tasks for today',
         checks: [false, false, false],
         completed: false,
         order: 1
@@ -275,7 +275,7 @@
         title: 'Clear Quick Errands',
         category: 'todo',
         pastel: 'sky',
-        note: 'Reply to pending emails\nPay utility bill\nTidy desk surface',
+        note: '[] Reply to pending emails\n[] Pay utility bill\n() Tidy desk surface',
         checks: [false, false, false],
         completed: false,
         order: 4
@@ -285,7 +285,7 @@
         title: 'Evening Wind Down',
         category: 'routine',
         pastel: 'blush',
-        note: 'Write down tomorrow’s top task\nClose open tabs\nNo screens 30 mins before bed',
+        note: '[] Write down tomorrow’s top task\n() Close open tabs\n() No screens 30 mins before bed',
         checks: [false, false, false],
         completed: false,
         order: 5
@@ -437,16 +437,35 @@
         let bodyHtml = '';
         if (isMultiLine) {
           bodyHtml = `<div class="space-y-2.5">` + lines.map((line, idx) => {
-            const checked = Array.isArray(card.checks) && card.checks[idx];
-            return `
-              <label class="flex items-start gap-3 cursor-pointer group">
-                <input type="checkbox" data-line-idx="${idx}" ${checked ? 'checked' : ''} class="mt-1 w-4 h-4 rounded border-slate-300 ${pTheme.checkAccent} cursor-pointer" />
-                <span style="font-size: ${nSize}px; line-height: 1.5;" class="${checked ? 'line-through text-slate-400' : 'text-slate-700'}">${escapeHtml(line)}</span>
-              </label>
-            `;
+            const m = line.match(/^(\(\s*[xX]?\s*\)|\[\s*[xX]?\s*\])\s*(.*)$/);
+            if (m) {
+              const checked = Array.isArray(card.checks) && card.checks[idx];
+              const textContent = m[2];
+              return `
+                <label class="flex items-start gap-3 cursor-pointer group">
+                  <input type="checkbox" data-line-idx="${idx}" ${checked ? 'checked' : ''} class="mt-1 w-4 h-4 rounded border-slate-300 ${pTheme.checkAccent} cursor-pointer" />
+                  <span style="font-size: ${nSize}px; line-height: 1.5;" class="${checked ? 'line-through text-slate-400' : 'text-slate-700'}">${escapeHtml(textContent)}</span>
+                </label>
+              `;
+            } else {
+              return `
+                <p style="font-size: ${nSize}px; line-height: 1.5;" class="text-slate-700">${escapeHtml(line)}</p>
+              `;
+            }
           }).join('') + `</div>`;
         } else {
-          bodyHtml = `<p style="font-size: ${nSize}px; line-height: 1.55;" class="text-slate-700">${escapeHtml(card.note || '')}</p>`;
+          const singleMatch = (card.note || '').trim().match(/^(\(\s*[xX]?\s*\)|\[\s*[xX]?\s*\])\s*(.*)$/);
+          if (singleMatch) {
+            const checked = Array.isArray(card.checks) && card.checks[0];
+            bodyHtml = `
+              <label class="flex items-start gap-3 cursor-pointer group">
+                <input type="checkbox" data-line-idx="0" ${checked ? 'checked' : ''} class="mt-1 w-4 h-4 rounded border-slate-300 ${pTheme.checkAccent} cursor-pointer" />
+                <span style="font-size: ${nSize}px; line-height: 1.55;" class="${checked ? 'line-through text-slate-400' : 'text-slate-700'}">${escapeHtml(singleMatch[2])}</span>
+              </label>
+            `;
+          } else {
+            bodyHtml = `<p style="font-size: ${nSize}px; line-height: 1.55;" class="text-slate-700">${escapeHtml(card.note || '')}</p>`;
+          }
         }
 
         cardEl.innerHTML = `
@@ -818,7 +837,8 @@
             existing.pastel = selectedPastel;
             existing.titleSize = currentTitleSize;
             existing.noteSize = currentNoteSize;
-            existing.checks = new Array(lineCount).fill(false);
+                        const lines = note.split('\n').filter(Boolean);
+            existing.checks = lines.map(line => /^(\(\s*[xX]\s*\)|\[\s*[xX]\s*\])/.test(line));
           }
         } else {
           const minOrder = cards.reduce((m, c) => Math.min(m, c.order || 0), 0);
@@ -830,7 +850,7 @@
             pastel: selectedPastel,
             titleSize: currentTitleSize,
             noteSize: currentNoteSize,
-            checks: new Array(lineCount).fill(false),
+                        checks: note.split('\n').filter(Boolean).map(line => /^(\(\s*[xX]\s*\)|\[\s*[xX]\s*\])/.test(line)),
             completed: false,
             order: minOrder - 1
           });

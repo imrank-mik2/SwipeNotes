@@ -1,16 +1,24 @@
-# Build SwipeNotes APK
+# SwipeNotes - App & Android Project
 
-This package contains the complete Android WebView wrapper project and the finalized, pastel-styled SwipeNotes app (`app/src/main/assets/index.html` and `index.html`).
+This archive contains both the standalone web app and the complete Android Studio project with GitHub Actions APK auto-build support.
 
-## Option 1: 1-Click Online Converter (No install needed)
-1. You can upload the included `index.html` file to tools like **WebIntoApp** (webintoapp.com) or **Website 2 APK Builder**.
-2. Select "HTML File", set the name to **SwipeNotes**, and click **Generate APK** to download the ready-to-install `.apk` directly to your phone.
+## File Contents
+- `index.html` - The standalone, single-file SwipeNotes web app.
+- `app/src/main/assets/index.html` - The embedded asset used by the Android app.
+- `app/` - The complete Android app module with native WebView wrapper.
+- `.github/workflows/build-apk.yml` - Ready-to-run GitHub Action to build `app-debug.apk` in the cloud.
 
-## Option 2: Automatic Cloud Build via GitHub (Free, no software)
-1. Create a free repository on GitHub and upload the files from this zip.
-2. The included GitHub Action (`.github/workflows/build-apk.yml`) runs automatically on push.
-3. Download **SwipeNotes-debug-apk** (`app-debug.apk`) directly from the GitHub **Actions** tab artifacts.
+## Quick Ways to Generate Your APK
 
-## Option 3: Local Android Studio
-1. Open **Android Studio** and choose **Open** on this project folder.
-2. Select **Build > Build Bundle(s) / APK(s) > Build APK(s)** to generate `app-debug.apk`.
+### 1. 1-Click Online Converter (Fastest)
+1. Upload the `index.html` file to [WebIntoApp](https://www.webintoapp.com/) or [Appsgeyser](https://appsgeyser.com/).
+2. Select "HTML File", enter **SwipeNotes**, and generate your ready-to-install `.apk` directly.
+
+### 2. Free Cloud Build with GitHub Actions
+1. Create a repository on GitHub and upload the contents of this zip.
+2. Go to the **Actions** tab and trigger the **Build SwipeNotes APK** workflow.
+3. Download the compiled `SwipeNotes-debug-apk` artifact.
+
+### 3. Local Android Studio
+1. Open this unzipped folder in **Android Studio**.
+2. Select **Build > Build Bundle(s) / APK(s) > Build APK(s)**.
